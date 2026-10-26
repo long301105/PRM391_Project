@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Heart, Trash2, X } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { products } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Product } from "@/data/products";
 import { useCart } from "@/context/CartContext";
 import { formatMoney } from "@/lib/format";
@@ -15,6 +15,7 @@ interface WishlistDrawerProps {
 
 export function WishlistDrawer({ onClose, onOpenProduct }: WishlistDrawerProps) {
   const { wishlist, toggleWishlist } = useCart();
+  const { products } = useCatalog();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

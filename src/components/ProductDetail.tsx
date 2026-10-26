@@ -17,7 +17,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { GALLERY_EXTRA, products, SIZES } from "@/data/products";
+import { GALLERY_EXTRA, SIZES } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Product } from "@/data/products";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { IconToast, useToast } from "@/context/ToastContext";
@@ -52,6 +53,7 @@ export function ProductDetail({
   onOpenRelated,
 }: ProductDetailProps) {
   const { addItem, addMultipleItems, count, isWished, toggleWishlist } = useCart();
+  const { products } = useCatalog();
   const { showToast } = useToast();
   const wished = isWished(product.id);
 

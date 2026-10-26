@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PRICE_MAX, PRICE_MIN, products } from "@/data/products";
+import { PRICE_MAX, PRICE_MIN } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Product } from "@/data/products";
 import { formatMoney } from "@/lib/format";
 import { Dropdown } from "@/components/Dropdown";
@@ -136,6 +137,7 @@ export function FilterSidebar({
   onOpenProduct,
   categoryCounts,
 }: FilterSidebarProps) {
+  const { products } = useCatalog();
   const [mobilePriceModal, setMobilePriceModal] = useState(false);
   const [mobileSearchModal, setMobileSearchModal] = useState(false);
   const [focused, setFocused] = useState(false);

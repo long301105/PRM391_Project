@@ -162,7 +162,7 @@ class ProductProvider extends ChangeNotifier {
       };
 
       if (_selectedCategory == 'sunset') {
-        queryParams['collection'] = 'SUNSET';
+        queryParams['collection'] = 'sunset';
       } else if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
         queryParams['category'] = _selectedCategory;
       }

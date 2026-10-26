@@ -70,6 +70,8 @@ class OrderModel {
   final int totalItems;
   final String paymentMethod; // 'COD' or 'BANK_TRANSFER' (or 'BANKING')
   final String status; // 'PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED'
+
+  final String? cancelReason;
   final DateTime createdAt;
 
   OrderModel({
@@ -89,11 +91,14 @@ class OrderModel {
     int? totalItems,
     required this.paymentMethod,
     this.status = 'PENDING',
+    this.cancelReason,
     required this.createdAt,
   })  : orderNumber = orderNumber ?? id,
         totalItems = totalItems ?? (items.isNotEmpty ? items.length : orderItems.length);
 
   String get displayOrderNumber => orderNumber.isNotEmpty ? orderNumber : id;
+
+  bool get canCustomerCancel => status.toUpperCase() == 'PENDING';
 
   String get statusText {
     final s = status.toUpperCase();
@@ -144,6 +149,7 @@ class OrderModel {
       'totalItems': totalItems,
       'paymentMethod': paymentMethod,
       'status': status,
+      'cancelReason': cancelReason,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -210,6 +216,7 @@ class OrderModel {
       totalItems: (json['totalItems'] as num?)?.toInt() ?? parsedCartItems.length,
       paymentMethod: (json['paymentMethod'] ?? 'COD') as String,
       status: (json['status'] ?? 'PENDING') as String,
+      cancelReason: json['cancelReason'] as String?,
       createdAt: parsedDate,
     );
   }

@@ -7,7 +7,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { Marquee } from "@/components/Marquee";
 import { BrandStory } from "@/components/BrandStory";
 import { ReviewsBoard } from "@/components/ReviewsBoard";
-import { products } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Product } from "@/data/products";
 import { paths } from "@/lib/paths";
 import { scrollToId } from "@/lib/scroll";
@@ -16,15 +16,12 @@ import { cn } from "@/utils/cn";
 export function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { products } = useCatalog();
 
-  const homeSunsetSets = [
-    products.find((p) => p.slug === "set-la-boutique-sunset-ss-26-1"),
-    products.find((p) => p.slug === "set-la-boutique-sunset"),
-    products.find((p) => p.slug === "set-la-boutique-sunset-ss-26-2"),
-  ].filter(Boolean) as Product[];
+  const homeSunsetSets: Product[] = products.filter((p) => p.isSummer).slice(0, 3);
 
-  const homeAoItems = products.filter((p) => p.type === "ao" && !p.isSummer && p.id <= 8);
-  const homeQuanItems = products.filter((p) => p.type === "quan" && p.id <= 10);
+  const homeAoItems = products.filter((p) => p.type === "ao" && !p.isSummer).slice(0, 8);
+  const homeQuanItems = products.filter((p) => p.type === "quan").slice(0, 6);
 
   const openProduct = (p: Product) => {
     navigate(paths.product(p.slug), { state: { from: location.pathname + location.search } });

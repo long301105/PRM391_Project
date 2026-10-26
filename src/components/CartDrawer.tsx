@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { CountUp } from "@/components/lightswind/count-up";
-import { products } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import { formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { cn } from "@/utils/cn";
@@ -17,10 +17,11 @@ interface CartDrawerProps {
   onCheckout: (items: CartItem[]) => void;
 }
 
-const itemKey = (it: { id: number; size: string }) => `${it.id}-${it.size}`;
+const itemKey = (it: { id: string; size: string }) => `${it.id}-${it.size}`;
 
 export function CartDrawer({ onClose, onCheckout }: CartDrawerProps) {
   const { items, count, updateQty, removeItem, removeMany } = useCart();
+  const { products } = useCatalog();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,7 +83,7 @@ export function CartDrawer({ onClose, onCheckout }: CartDrawerProps) {
     onCheckout(selectedItems);
   };
 
-  const openProduct = (id: number) => {
+  const openProduct = (id: string) => {
     const slug = products.find((p) => p.id === id)?.slug;
     if (!slug) return;
     onClose();

@@ -5,7 +5,6 @@ import '../core/network/api_exception.dart';
 import '../core/storage/token_store.dart';
 
 /// Lớp mạng trung tâm của app, dựng trên **Dio**.
-///
 /// Giữ nguyên interface cũ (`get/post/patch/delete`, `setTokens`, `clearTokens`...) để các
 /// provider khác (product, order, auth) không phải đổi. Điểm nâng cấp (GĐ 2):
 /// - Token lưu bằng **secure storage** (xem [TokenStore]).
@@ -73,8 +72,11 @@ class ApiService {
   Future<dynamic> patch(String path, {dynamic body, bool requiresAuth = true}) =>
       _send('PATCH', path, body: body, requiresAuth: requiresAuth);
 
-  Future<dynamic> delete(String path, {bool requiresAuth = true}) =>
-      _send('DELETE', path, requiresAuth: requiresAuth);
+  Future<dynamic> put(String path, {dynamic body, bool requiresAuth = true}) =>
+      _send('PUT', path, body: body, requiresAuth: requiresAuth);
+
+  Future<dynamic> delete(String path, {Map<String, dynamic>? queryParams, bool requiresAuth = true}) =>
+      _send('DELETE', path, queryParams: queryParams, requiresAuth: requiresAuth);
 
   // --- Lõi ---
 
@@ -154,6 +156,48 @@ class ApiService {
       }
     }
     throw ApiException(statusCode: status, message: message, fieldErrors: fieldErrors);
+  }
+
+  Future<dynamic> sendFile(
+    String method,
+    String path, {
+    required String filePath,
+    String field = 'file',
+  }) async {
+    Future<FormData> buildForm() async => FormData.fromMap({
+          field: await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split(RegExp(r'[\\/]')).last,
+          ),
+        });
+
+    Future<Response<dynamic>> call() async => _dio.request(
+          path,
+          data: await buildForm(),
+          options: Options(
+            method: method,
+            contentType: 'multipart/form-data',
+            headers: (_accessToken?.isNotEmpty ?? false)
+                ? {'Authorization': 'Bearer $_accessToken'}
+                : null,
+          ),
+        );
+
+    try {
+      var resp = await call();
+
+      if (resp.statusCode == 401 && (_refreshToken?.isNotEmpty ?? false)) {
+        final refreshed = await _attemptRefreshToken();
+        if (refreshed) resp = await call();
+      }
+
+      return _processResponse(resp);
+    } on ApiException {
+      rethrow;
+    } on DioException catch (e) {
+      debugPrint('[ApiService] upload error: ${e.message}');
+      throw ApiException(statusCode: 0, message: 'Không tải được ảnh lên. Vui lòng kiểm tra mạng.');
+    }
   }
 
   // --- Refresh token: chống đua bằng một Future dùng chung ---

@@ -3,7 +3,8 @@ import { useLayoutEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FilterSidebar } from "@/components/FilterBar";
 import { ProductCard } from "@/components/ProductCard";
-import { PRICE_MAX, PRICE_MIN, products } from "@/data/products";
+import { PRICE_MAX, PRICE_MIN } from "@/data/products";
+import { useCatalog } from "@/context/CatalogContext";
 import type { Product } from "@/data/products";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { CATALOG_LABEL, isCatalogSlug, paths } from "@/lib/paths";
@@ -20,6 +21,7 @@ const CAT_LABEL: Record<string, string> = {
 };
 
 export function CatalogPage() {
+  const { products, loading, error, reload } = useCatalog();
   const { category: catParam } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -51,7 +53,9 @@ export function CatalogPage() {
     const arr = [...filtered];
     if (sort === "price-asc") arr.sort((a, b) => a.price - b.price);
     else if (sort === "price-desc") arr.sort((a, b) => b.price - a.price);
-    else if (sort === "new") arr.sort((a, b) => b.id - a.id);
+    else if (sort === "new") {
+      arr.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    }
     return arr;
   }, [filtered, sort]);
 
@@ -144,7 +148,24 @@ export function CatalogPage() {
         />
 
         <div className="flex-1 min-w-0">
-          {paginatedItems.length === 0 ? (
+          {loading && products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-sand-300 bg-white py-16 text-center text-mute">
+              <p className="text-sm font-medium text-ink">Đang tải sản phẩm...</p>
+            </div>
+          ) : error && products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-rose-300 bg-white py-16 text-center">
+              <PackageOpen className="mb-2.5 h-9 w-9 text-rose-300" strokeWidth={1.3} />
+              <p className="text-sm font-medium text-ink">Không tải được sản phẩm</p>
+              <p className="mt-1 max-w-sm px-6 text-xs leading-relaxed text-mute">{error}</p>
+              <button
+                type="button"
+                onClick={() => void reload()}
+                className="mt-4 rounded-full bg-ink px-6 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : paginatedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-sand-300 py-16 text-center text-mute bg-white">
               <PackageOpen className="mb-2.5 h-9 w-9 text-sand-300" strokeWidth={1.3} />
               <p className="text-sm font-medium text-ink">Không tìm thấy sản phẩm phù hợp</p>

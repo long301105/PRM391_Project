@@ -105,6 +105,8 @@ class Product {
     return gallery.map((g) => _resolveImagePath(g)).toList();
   }
 
+  static String resolveImage(String? path) => _resolveImagePath(path ?? '');
+
   static String _resolveImagePath(String path) {
     if (path.isEmpty) return 'assets/images/products/sunset-main-1.jpg';
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -172,7 +174,8 @@ class Product {
       type: catSlug,
       isSummer: json['isSummer'] as bool? ?? false,
       isFeatured: json['isFeatured'] as bool? ?? false,
-      collection: (json['collection'] as String?)?.toUpperCase() ?? 'REGULAR',
+      collection: (json['collection'] as String?)?.toUpperCase() ??
+          (((json['isSummer'] as bool?) ?? false) ? 'SUNSET' : 'REGULAR'),
       img: thumbnail,
       gallery: parsedGallery,
       variants: parsedVariants,

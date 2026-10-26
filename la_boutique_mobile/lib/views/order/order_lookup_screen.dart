@@ -16,6 +16,8 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
   final TextEditingController _queryController = TextEditingController();
   List<OrderModel>? _searchResults;
   bool _hasSearched = false;
+  bool _isSearching = false;
+  String? _lookupError;
 
   @override
   void dispose() {
@@ -23,25 +25,38 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
     super.dispose();
   }
 
-  void _performLookup() {
+  Future<void> _performLookup() async {
     final query = _queryController.text.trim();
     if (query.isEmpty) return;
 
     final orderProvider = context.read<OrderProvider>();
+    setState(() {
+      _isSearching = true;
+      _lookupError = null;
+    });
+
+    final looksLikePhone = RegExp(r'^[0-9+\s]+$').hasMatch(query);
     final results = <OrderModel>[];
 
-    // Check by Order ID
-    final singleOrder = orderProvider.getOrderById(query);
-    if (singleOrder != null) {
-      results.add(singleOrder);
-    } else {
-      // Check by Phone
+    if (looksLikePhone) {
+      if (orderProvider.orders.isEmpty) {
+        await orderProvider.fetchMyOrders();
+      }
       results.addAll(orderProvider.searchOrdersByPhone(query));
+    } else {
+      final fetched = await orderProvider.fetchOrderDetail(query);
+      if (fetched != null) {
+        results.add(fetched);
+      } else {
+        _lookupError = orderProvider.errorMessage;
+      }
     }
 
+    if (!mounted) return;
     setState(() {
       _searchResults = results;
       _hasSearched = true;
+      _isSearching = false;
     });
   }
 
@@ -97,7 +112,7 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          onSubmitted: (_) => _performLookup(),
+                          onSubmitted: (_) => _isSearching ? null : _performLookup(),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -106,8 +121,14 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        onPressed: _performLookup,
-                        child: const Text('TRA CỨU', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: _isSearching ? null : _performLookup,
+                        child: _isSearching
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('TRA CỨU', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -131,9 +152,10 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.ink),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Vui lòng kiểm tra lại mã đơn hàng hoặc số điện thoại',
-                          style: TextStyle(fontSize: 13, color: AppColors.mute),
+                        Text(
+                          _lookupError ?? 'Vui lòng kiểm tra lại mã đơn hàng hoặc số điện thoại',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13, color: AppColors.mute),
                         ),
                       ],
                     ),

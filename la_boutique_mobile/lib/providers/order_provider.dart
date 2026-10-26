@@ -1,6 +1,6 @@
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../core/constants/api_constants.dart';
+import '../core/network/api_exception.dart';
 import '../models/order.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
@@ -16,46 +16,15 @@ class OrderProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  OrderProvider() {
-    _initSampleOrders();
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
   }
 
-  void _initSampleOrders() {
-    _orders.addAll([
-      OrderModel(
-        id: 'LB-90214',
-        orderNumber: 'LB-90214',
-        customerName: 'Hoàng Lan',
-        phone: '0901234567',
-        address: '72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
-        note: 'Giao giờ hành chính giúp em',
-        items: [],
-        subtotal: 720000,
-        discount: 72000,
-        shippingFee: 0,
-        total: 648000,
-        totalItems: 1,
-        paymentMethod: 'COD',
-        status: 'SHIPPING',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      OrderModel(
-        id: 'LB-88312',
-        orderNumber: 'LB-88312',
-        customerName: 'Minh Thư',
-        phone: '0901234567',
-        address: 'Tòa nhà Landmark 81, Bình Thạnh, TP.HCM',
-        items: [],
-        subtotal: 1000000,
-        discount: 0,
-        shippingFee: 0,
-        total: 1000000,
-        totalItems: 2,
-        paymentMethod: 'BANK_TRANSFER',
-        status: 'COMPLETED',
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-    ]);
+  void clearOrders() {
+    _orders.clear();
+    _errorMessage = null;
+    notifyListeners();
   }
 
   Future<void> fetchMyOrders() async {
@@ -70,16 +39,21 @@ class OrderProvider extends ChangeNotifier {
         requiresAuth: true,
       );
 
-      if (result != null && result is Map<String, dynamic> && result['content'] is List) {
+      if (result is Map<String, dynamic> && result['content'] is List) {
         final list = (result['content'] as List)
-            .map((o) => OrderModel.fromJson(o as Map<String, dynamic>))
+            .whereType<Map<String, dynamic>>()
+            .map(OrderModel.fromJson)
             .toList();
 
-        _orders.clear();
-        _orders.addAll(list);
+        _orders
+          ..clear()
+          ..addAll(list);
       }
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
     } catch (e) {
-      debugPrint('[OrderProvider] fetchMyOrders fallback: $e');
+      debugPrint('[OrderProvider] fetchMyOrders error: $e');
+      _errorMessage = 'Không tải được danh sách đơn hàng.';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -87,26 +61,34 @@ class OrderProvider extends ChangeNotifier {
   }
 
   Future<OrderModel?> fetchOrderDetail(String orderNumber) async {
+    _errorMessage = null;
     try {
       final result = await _api.get(
-        ApiConstants.myOrderByNumber(orderNumber),
+        ApiConstants.myOrderByNumber(orderNumber.trim().toUpperCase()),
         requiresAuth: true,
       );
 
-      if (result != null && result is Map<String, dynamic>) {
+      if (result is Map<String, dynamic>) {
         final detailedOrder = OrderModel.fromJson(result);
-        final index = _orders.indexWhere((o) => o.orderNumber == orderNumber);
+        final index = _orders.indexWhere((o) => o.orderNumber == detailedOrder.orderNumber);
         if (index != -1) {
           _orders[index] = detailedOrder;
-          notifyListeners();
+        } else {
+          _orders.insert(0, detailedOrder);
         }
+        notifyListeners();
         return detailedOrder;
       }
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
     } catch (e) {
       debugPrint('[OrderProvider] fetchOrderDetail error: $e');
+      _errorMessage = 'Không tải được chi tiết đơn hàng.';
+      notifyListeners();
     }
 
-    return getOrderById(orderNumber);
+    return getOrderByNumber(orderNumber);
   }
 
   Future<String> createOrder({
@@ -126,87 +108,95 @@ class OrderProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    // Map payment method to BE enum
-    final bePaymentMethod = (paymentMethod == 'BANKING' || paymentMethod == 'BANK_TRANSFER')
-        ? 'BANK_TRANSFER'
-        : 'COD';
-
-    // Format items for BE
-    final itemsPayload = items.map((item) {
-      return {
-        'productId': item.product.id,
-        'size': item.size.toUpperCase(),
-        'quantity': item.quantity,
-      };
-    }).toList();
+    final bePaymentMethod =
+        (paymentMethod == 'BANKING' || paymentMethod == 'BANK_TRANSFER') ? 'BANK_TRANSFER' : 'COD';
 
     final orderBody = {
       'receiverName': customerName.trim(),
       'phone': phone.trim(),
-      'email': email != null && email.trim().isNotEmpty ? email.trim() : null,
+      'email': (email != null && email.trim().isNotEmpty) ? email.trim() : null,
       'address': address.trim(),
-      'note': note != null && note.trim().isNotEmpty ? note.trim() : null,
+      'note': (note != null && note.trim().isNotEmpty) ? note.trim() : null,
       'paymentMethod': bePaymentMethod,
-      'items': itemsPayload,
+      'items': items
+          .map((item) => {
+                'productId': item.product.id,
+                'size': item.size.toUpperCase(),
+                'quantity': item.quantity,
+              })
+          .toList(),
     };
 
     try {
+      final result = await _api.post(ApiConstants.orders, body: orderBody, requiresAuth: true);
+
+      if (result is! Map<String, dynamic>) {
+        throw ApiException(statusCode: 0, message: 'Máy chủ trả dữ liệu đơn không đúng định dạng.');
+      }
+
+      final createdOrder = OrderModel.fromJson(result);
+      _orders.insert(0, createdOrder);
+      return createdOrder.orderNumber;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      rethrow;
+    } catch (e) {
+      debugPrint('[OrderProvider] createOrder error: $e');
+      _errorMessage = 'Đặt hàng không thành công. Vui lòng thử lại.';
+      throw ApiException(statusCode: 0, message: _errorMessage!);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> cancelMyOrder(String orderNumber, {String? reason}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
       final result = await _api.post(
-        ApiConstants.orders,
-        body: orderBody,
+        ApiConstants.cancelMyOrder(orderNumber.trim().toUpperCase()),
+        body: (reason != null && reason.trim().isNotEmpty) ? {'reason': reason.trim()} : null,
         requiresAuth: true,
       );
 
-      if (result != null && result is Map<String, dynamic>) {
-        final createdOrder = OrderModel.fromJson(result);
-        _orders.insert(0, createdOrder);
-        _isLoading = false;
-        notifyListeners();
-        return createdOrder.orderNumber;
+      if (result is Map<String, dynamic>) {
+        final cancelled = OrderModel.fromJson(result);
+        final index = _orders.indexWhere((o) => o.orderNumber == cancelled.orderNumber);
+        if (index != -1) {
+          _orders[index] = cancelled;
+        }
       }
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      return false;
     } catch (e) {
-      debugPrint('[OrderProvider] BE createOrder failed, fallback to local: $e');
+      debugPrint('[OrderProvider] cancelMyOrder error: $e');
+      _errorMessage = 'Huỷ đơn không thành công. Vui lòng thử lại.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    // Local fallback order creation
-    final randomId = 'LB-${10000 + Random().nextInt(90000)}';
-    final fallbackOrder = OrderModel(
-      id: randomId,
-      orderNumber: randomId,
-      customerName: customerName,
-      phone: phone,
-      email: email,
-      address: address,
-      note: note,
-      items: List.from(items),
-      subtotal: subtotal,
-      discount: discount,
-      shippingFee: shippingFee,
-      total: total,
-      totalItems: items.length,
-      paymentMethod: bePaymentMethod,
-      status: 'PENDING',
-      createdAt: DateTime.now(),
-    );
-
-    _orders.insert(0, fallbackOrder);
-    _isLoading = false;
-    notifyListeners();
-    return randomId;
   }
 
   List<OrderModel> searchOrdersByPhone(String phone) {
     final clean = phone.trim().replaceAll(' ', '');
+    if (clean.isEmpty) return const [];
     return _orders.where((o) => o.phone.replaceAll(' ', '').contains(clean)).toList();
   }
 
-  OrderModel? getOrderById(String orderId) {
-    final clean = orderId.trim().toUpperCase();
-    try {
-      return _orders.firstWhere((o) =>
-          o.id.toUpperCase() == clean || o.orderNumber.toUpperCase() == clean);
-    } catch (_) {
-      return null;
+  OrderModel? getOrderByNumber(String orderIdOrNumber) {
+    final clean = orderIdOrNumber.trim().toUpperCase();
+    if (clean.isEmpty) return null;
+    for (final o in _orders) {
+      if (o.id.toUpperCase() == clean || o.orderNumber.toUpperCase() == clean) return o;
     }
+    return null;
   }
+
+  OrderModel? getOrderById(String orderId) => getOrderByNumber(orderId);
 }

@@ -12,6 +12,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { fetchMyOrderByNumber } from "@/api/orders";
+import { useAuth } from "@/context/AuthContext";
+import { ApiError } from "@/lib/api";
 import { useCart, type OrderRecord } from "@/context/CartContext";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/utils/cn";
@@ -34,10 +37,13 @@ export function OrderLookupModal({
   onClose,
   variant = "modal",
 }: OrderLookupModalProps) {
-  const { lookupOrder } = useCart();
+  const { lookupOrder, rememberOrder } = useCart();
+  const { isAuthenticated, requireLogin } = useAuth();
   const [query, setQuery] = useState(initialCode);
   const [searched, setSearched] = useState(false);
   const [order, setOrder] = useState<OrderRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -51,52 +57,56 @@ export function OrderLookupModal({
     }
   }, [initialCode]);
 
-  const handleSearch = (searchVal?: string) => {
+  const handleSearch = async (searchVal?: string) => {
     const q = (searchVal ?? query).trim();
     if (!q) return;
 
     setSearched(true);
-    const found = lookupOrder(q);
+    setLookupError(null);
 
-    if (found) {
-      setOrder(found);
-    } else {
-      // Demo order if user looks up default demo code
-      if (q.toUpperCase().includes("LBVN") || q.includes("0909")) {
-        setOrder({
-          orderNumber: q.toUpperCase().includes("LBVN") ? q.toUpperCase() : "LBVN-2608-X8YZ",
-          customerName: "Nguyễn Phương Linh",
-          phone: "0909 123 456",
-          address: "126 Nguyễn Trãi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh",
-          paymentMethod: "cod",
-          status: "shipping",
-          subtotal: 978000,
-          shippingFee: 30000,
-          discount: 0,
-          total: 1008000,
-          items: [
-            {
-              id: 1,
-              name: "Đầm Yếm Lụa Hoàng Hôn",
-              price: 459000,
-              img: "https://images.pexels.com/photos/28190543/pexels-photo-28190543.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1100&w=750",
-              size: "M",
-              qty: 1,
-            },
-            {
-              id: 6,
-              name: "Chân Váy Midi Xẻ Tà Sóng",
-              price: 519000,
-              img: "https://images.pexels.com/photos/8220735/pexels-photo-8220735.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1100&w=750",
-              size: "S",
-              qty: 1,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        });
-      } else {
+    const local = lookupOrder(q);
+    if (local) setOrder(local);
+
+    const looksLikePhone = /^[0-9+\s]+$/.test(q);
+    if (looksLikePhone) {
+      if (!local) {
         setOrder(null);
+        setLookupError(
+          isAuthenticated
+            ? "Không tìm thấy đơn nào với số điện thoại này trong các đơn đã tải. Hãy tra bằng mã đơn."
+            : "Đăng nhập để xem đơn hàng của bạn."
+        );
       }
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setOrder(local ?? null);
+      if (!local) {
+        setLookupError("Đăng nhập để tra cứu đơn hàng của bạn.");
+        requireLogin();
+      }
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const found = await fetchMyOrderByNumber(q);
+      setOrder(found);
+      rememberOrder(found);
+    } catch (err) {
+      if (!local) {
+        setOrder(null);
+        setLookupError(
+          err instanceof ApiError
+            ? err.status === 404
+              ? `Không tìm thấy đơn ${q.toUpperCase()} trong tài khoản này.`
+              : err.message
+            : "Không tra cứu được đơn hàng. Vui lòng thử lại."
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

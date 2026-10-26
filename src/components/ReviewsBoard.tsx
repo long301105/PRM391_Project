@@ -49,7 +49,7 @@ const SORTS = [
   { id: "low", label: "Tất cả sao" },
 ];
 
-export function ReviewsBoard({ productId }: { productId?: number }) {
+export function ReviewsBoard({ productId }: { productId?: string }) {
   const { showToast } = useToast();
   const [reviews, setReviews] = useState<ReviewItem[]>(SEED);
   const [sort, setSort] = useState("new");

@@ -9,6 +9,8 @@ import '../../providers/notification_provider.dart';
 import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
 import '../chat/chat_screen.dart';
+import '../admin/admin_home_screen.dart';
+import '../collection/collection_list_screen.dart';
 import '../map/store_map_screen.dart';
 import '../notification/notification_screen.dart';
 import '../product/product_list_screen.dart';
@@ -455,6 +457,70 @@ class _HomeTabState extends State<_HomeTab> {
                     ],
                   ),
                 ],
+              ),
+            ),
+
+            if ((context.watch<AuthProvider>().accountInfo?.roleName ?? '').toUpperCase() ==
+                'ADMIN')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: AppColors.ink,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.white),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Khu quản trị',
+                            style: TextStyle(
+                                fontSize: 13.5, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, size: 18, color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CollectionListScreen()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: AppColors.clay50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.clay100),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.collections_bookmark_outlined, size: 20, color: AppColors.clay600),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Tất cả bộ sưu tập',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.clay600),
+                    ],
+                  ),
+                ),
               ),
             ),
 

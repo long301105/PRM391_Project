@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import type { Product } from "@/data/products";
 
 export interface CartItem {
-  id: number;
+  id: string;
   name: string;
   price: number;
   img: string;
@@ -35,6 +35,7 @@ export interface OrderRecord {
   total: number;
   items: CartItem[];
   createdAt: string;
+  cancelReason?: string;
 }
 
 interface CartContextValue {
@@ -44,23 +45,23 @@ interface CartContextValue {
   addItem: (product: Product, size: string, qty?: number) => void;
   addMultipleItems: (product: Product, sizeSelection: Record<string, number>) => void;
   mergeItems: (incoming: CartItem[]) => void;
-  updateQty: (id: number, size: string, qty: number) => void;
-  removeItem: (id: number, size: string) => void;
-  removeMany: (keys: Array<{ id: number; size: string }>) => void;
+  updateQty: (id: string, size: string, qty: number) => void;
+  removeItem: (id: string, size: string) => void;
+  removeMany: (keys: Array<{ id: string; size: string }>) => void;
   clear: () => void;
-  wishlist: number[];
-  toggleWishlist: (id: number) => void;
-  isWished: (id: number) => boolean;
+  wishlist: string[];
+  toggleWishlist: (id: string) => void;
+  isWished: (id: string) => boolean;
   orders: OrderRecord[];
-  saveOrder: (order: Omit<OrderRecord, "orderNumber" | "status" | "createdAt">) => OrderRecord;
+  rememberOrder: (order: OrderRecord) => void;
   lookupOrder: (codeOrPhone: string) => OrderRecord | null;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-const CART_KEY = "la-boutique-cart-v3";
-const WISH_KEY = "la-boutique-wish-v3";
-const ORDERS_KEY = "la-boutique-orders-v3";
+const CART_KEY = "la-boutique-cart-v4";
+const WISH_KEY = "la-boutique-wish-v4";
+const ORDERS_KEY = "la-boutique-orders-v4";
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -74,13 +75,13 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<number[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setItems(loadFromStorage<CartItem[]>(CART_KEY, []));
-    setWishlist(loadFromStorage<number[]>(WISH_KEY, []));
+    setWishlist(loadFromStorage<string[]>(WISH_KEY, []));
     setOrders(loadFromStorage<OrderRecord[]>(ORDERS_KEY, []));
     setHydrated(true);
   }, []);
@@ -169,7 +170,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateQty = useCallback((id: number, size: string, qty: number) => {
+  const updateQty = useCallback((id: string, size: string, qty: number) => {
     if (qty <= 0) {
       setItems((prev) => prev.filter((it) => !(it.id === id && it.size === size)));
       return;
@@ -179,11 +180,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const removeItem = useCallback((id: number, size: string) => {
+  const removeItem = useCallback((id: string, size: string) => {
     setItems((prev) => prev.filter((it) => !(it.id === id && it.size === size)));
   }, []);
 
-  const removeMany = useCallback((keys: Array<{ id: number; size: string }>) => {
+  const removeMany = useCallback((keys: Array<{ id: string; size: string }>) => {
     if (!keys.length) return;
     setItems((prev) =>
       prev.filter((it) => !keys.some((k) => k.id === it.id && k.size === it.size))
@@ -194,36 +195,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
   }, []);
 
-  const toggleWishlist = useCallback((id: number) => {
+  const toggleWishlist = useCallback((id: string) => {
     setWishlist((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }, []);
 
-  const isWished = useCallback((id: number) => wishlist.includes(id), [wishlist]);
+  const isWished = useCallback((id: string) => wishlist.includes(id), [wishlist]);
 
-  const saveOrder = useCallback(
-    (orderData: Omit<OrderRecord, "orderNumber" | "status" | "createdAt">): OrderRecord => {
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      let rand = "";
-      for (let i = 0; i < 4; i++) {
-        rand += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      const dateStr = new Date().toISOString().slice(2, 7).replace("-", "");
-      const orderNumber = `LBVN-${dateStr}-${rand}`;
-
-      const newOrder: OrderRecord = {
-        ...orderData,
-        orderNumber,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      };
-
-      setOrders((prev) => [newOrder, ...prev]);
-      return newOrder;
-    },
-    []
-  );
+  const rememberOrder = useCallback((order: OrderRecord) => {
+    setOrders((prev) => {
+      const rest = prev.filter((o) => o.orderNumber !== order.orderNumber);
+      return [order, ...rest];
+    });
+  }, []);
 
   const lookupOrder = useCallback(
     (codeOrPhone: string): OrderRecord | null => {
@@ -260,7 +245,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         toggleWishlist,
         isWished,
         orders,
-        saveOrder,
+        rememberOrder,
         lookupOrder,
       }}
     >

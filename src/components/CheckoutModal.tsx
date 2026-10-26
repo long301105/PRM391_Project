@@ -4,6 +4,9 @@ import { motion } from "framer-motion";
 import { Check, Copy, QrCode, Truck, Wallet, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCart, type CartItem, type OrderRecord } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import { placeOrder } from "@/api/orders";
+import { ApiError } from "@/lib/api";
 import { useToast } from "@/context/ToastContext";
 import { CountUp } from "@/components/lightswind/count-up";
 import { formatMoney } from "@/lib/format";
@@ -22,7 +25,8 @@ export function CheckoutModal({
   itemsOverride = null,
   intent = "cart",
 }: CheckoutModalProps) {
-  const { items: cartItems, clear, saveOrder } = useCart();
+  const { items: cartItems, clear, rememberOrder } = useCart();
+  const { isAuthenticated, requireLogin } = useAuth();
   const { showToast } = useToast();
   const isDirect = Array.isArray(itemsOverride);
   const items = isDirect ? itemsOverride : cartItems;
@@ -43,15 +47,23 @@ export function CheckoutModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const shipping = payment === "qr" ? 0 : 30000;
+  const FREE_SHIPPING_THRESHOLD = 1_000_000;
+  const shipping = payment === "qr" || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 30000;
   const total = subtotal + shipping;
   const qrMemo = `LBVN ${phone.replace(/\s+/g, "").slice(-4) || "0000"}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(
     `LA BOUTIQUE VN\nSo tien: ${total}d\nNoi dung: ${qrMemo}`
   )}`;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isAuthenticated) {
+      showToast("Đăng nhập để đặt hàng.", "info");
+      requireLogin();
+      return;
+    }
+
     if (!name.trim() || !phone.trim() || !address.trim()) {
       showToast("Vui lòng điền họ tên, số điện thoại và địa chỉ nhận hàng.", "info");
       return;
@@ -63,24 +75,33 @@ export function CheckoutModal({
     }
 
     setLoading(true);
+    try {
+      const created = await placeOrder({
+        customerName: name,
+        phone,
+        email: email.trim() || undefined,
+        address,
+        note: note.trim() || undefined,
+        paymentMethod: payment,
+        items: [...items],
+      });
 
-    const newOrder = saveOrder({
-      customerName: name.trim(),
-      phone: phone.trim(),
-      email: email.trim() || undefined,
-      address: address.trim(),
-      note: note.trim() || undefined,
-      paymentMethod: payment,
-      subtotal,
-      shippingFee: shipping,
-      discount: 0,
-      total,
-      items: [...items],
-    });
-
-    if (!isDirect) clear();
-    setLoading(false);
-    onSuccess(newOrder);
+      rememberOrder(created);
+      if (!isDirect) clear();
+      onSuccess(created);
+    } catch (err) {
+      if (err instanceof ApiError && err.isUnauthorized) {
+        showToast("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.", "info");
+        requireLogin();
+      } else {
+        showToast(
+          err instanceof ApiError ? err.message : "Đặt hàng không thành công. Vui lòng thử lại.",
+          "info"
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -140,6 +161,21 @@ export function CheckoutModal({
             ))}
           </div>
         </div>
+
+        {!isAuthenticated && (
+          <button
+            type="button"
+            onClick={requireLogin}
+            className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left"
+          >
+            <span className="text-xs leading-relaxed text-amber-800">
+              Cần đăng nhập để đặt hàng — đơn được lưu vào tài khoản để nàng tra cứu về sau.
+            </span>
+            <span className="shrink-0 rounded-full bg-ink px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              Đăng nhập
+            </span>
+          </button>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           {/* Customer Name */}
@@ -353,7 +389,9 @@ export function CheckoutModal({
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-ink py-4 text-xs font-bold uppercase tracking-wider text-white shadow-xl transition hover:bg-clay-600 active:scale-[0.99] disabled:opacity-50"
           >
-            <span>Hoàn tất đặt hàng — {formatMoney(total)}</span>
+            <span>
+              {loading ? "Đang gửi đơn..." : `Hoàn tất đặt hàng — ${formatMoney(total)}`}
+            </span>
           </button>
         </form>
       </motion.div>

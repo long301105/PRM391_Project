@@ -72,11 +72,16 @@ class ApiConstants {
 
   // Product endpoints
   static const String products = '/products';
-  static String productById(String id) => '/products/$id';
+  static String productById(String id) => '/products/id/$id';
   static String productBySlug(String slug) => '/products/slug/$slug';
 
   // Order endpoints
   static const String orders = '/orders';
   static const String myOrders = '/orders/me';
   static String myOrderByNumber(String orderNumber) => '/orders/me/$orderNumber';
+
+  static String cancelMyOrder(String orderNumber) => '/orders/me/$orderNumber/cancel';
+
+  static const String collections = '/collections';
+  static String collectionBySlug(String slug) => '/collections/slug/$slug';
 }

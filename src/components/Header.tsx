@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Heart, ShoppingBag, Truck } from "lucide-react";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { IconToast } from "@/context/ToastContext";
 import { paths } from "@/lib/paths";
@@ -24,6 +25,7 @@ const NAV = [
 ];
 
 export function Header({ onOpenCart, onOpenWishlist, onOpenLookup, forceSolid = false }: HeaderProps) {
+  const { isAdmin } = useAuth();
   const { count, wishlist } = useCart();
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -98,6 +100,20 @@ export function Header({ onOpenCart, onOpenWishlist, onOpenLookup, forceSolid = 
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={cn(
+                  "mr-1 hidden rounded-full px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider transition md:inline-block",
+                  light
+                    ? "bg-white/20 text-white hover:bg-white/30"
+                    : "bg-ink text-white hover:bg-clay-600"
+                )}
+              >
+                Quản trị
+              </Link>
+            )}
+
             <button
               onClick={onOpenLookup}
               aria-label="Tra cứu đơn hàng"

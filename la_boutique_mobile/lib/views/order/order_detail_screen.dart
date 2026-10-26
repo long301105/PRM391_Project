@@ -20,6 +20,7 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   OrderModel? _order;
   bool _isLoading = true;
+  bool _isCancelling = false;
 
   @override
   void initState() {
@@ -36,6 +37,79 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _cancelOrder() async {
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Huỷ đơn hàng?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Đơn #${widget.orderNumber} sẽ được huỷ và không thể hoàn lại. '
+              'Hàng trong đơn được trả về kho ngay.',
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              maxLength: 300,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Lý do huỷ (không bắt buộc)',
+                hintText: 'VD: Em đặt nhầm size',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Giữ đơn'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('HUỶ ĐƠN'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      reasonController.dispose();
+      return;
+    }
+
+    final reason = reasonController.text;
+    reasonController.dispose();
+
+    setState(() => _isCancelling = true);
+    final orderProvider = context.read<OrderProvider>();
+    final ok = await orderProvider.cancelMyOrder(widget.orderNumber, reason: reason);
+
+    if (!mounted) return;
+    setState(() => _isCancelling = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Đã huỷ đơn #${widget.orderNumber}. Hàng đã được trả về kho.'
+            : (orderProvider.errorMessage ?? 'Huỷ đơn không thành công.')),
+        backgroundColor: ok ? AppColors.success : Colors.red,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+
+    if (ok) await _loadOrder();
   }
 
   void _copyOrderNumber(String code) {
@@ -92,7 +166,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Widget _buildStatusTracker(String status) {
+  Widget _buildStatusTracker(String status, {String? cancelReason}) {
     final step = _getStatusStep(status);
     final isCancelled = step == -1;
 
@@ -105,12 +179,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           border: Border.all(color: Colors.red.shade200),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
             const SizedBox(width: 10),
-            Text(
-              'Đơn hàng này đã bị hủy',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Đơn hàng này đã bị hủy',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800),
+                  ),
+                  if (cancelReason != null && cancelReason.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Lý do: $cancelReason',
+                      style: TextStyle(fontSize: 12.5, color: Colors.red.shade700, height: 1.35),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -238,7 +327,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Status tracker
-            _buildStatusTracker(order.status),
+            _buildStatusTracker(order.status, cancelReason: order.cancelReason),
             const SizedBox(height: 14),
 
             // Receiver Info
@@ -380,6 +469,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
             const SizedBox(height: 14),
+
+            if (order.canCustomerCancel) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade700,
+                    side: BorderSide(color: Colors.red.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _isCancelling ? null : _cancelOrder,
+                  icon: _isCancelling
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.close_rounded, size: 18),
+                  label: Text(
+                    _isCancelling ? 'ĐANG HUỶ...' : 'HUỶ ĐƠN HÀNG NÀY',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Chỉ huỷ được khi đơn còn ở trạng thái "Chờ xác nhận".',
+                style: TextStyle(fontSize: 11.5, color: AppColors.mute),
+              ),
+              const SizedBox(height: 14),
+            ],
 
             // Hỗ trợ đơn hàng: gọi hotline hoặc chat Zalo
             Container(

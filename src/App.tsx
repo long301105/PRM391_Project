@@ -11,6 +11,15 @@ import { CheckoutModal } from "@/components/CheckoutModal";
 import { SuccessModal } from "@/components/SuccessModal";
 import { BottomNav } from "@/components/BottomNav";
 import { CartProvider, useCart, type CartItem, type OrderRecord } from "@/context/CartContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { AdminLayout } from "@/pages/admin/AdminLayout";
+import { AdminAccountsPage } from "@/pages/admin/AdminAccountsPage";
+import { AdminCategoriesPage } from "@/pages/admin/AdminCategoriesPage";
+import { AdminCollectionsPage } from "@/pages/admin/AdminCollectionsPage";
+import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
+import { AdminProductsPage } from "@/pages/admin/AdminProductsPage";
+import { AdminRolesPage } from "@/pages/admin/AdminRolesPage";
+import { CatalogProvider } from "@/context/CatalogContext";
 import { ToastProvider } from "@/context/ToastContext";
 import type { CheckoutIntent, ShopOutletContext } from "@/context/ShopOutlet";
 import { useScrollLock } from "@/hooks/useScrollLock";
@@ -221,6 +230,16 @@ function ShopApp() {
     <>
       <ScrollToTop />
       <Routes>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/don-hang" replace />} />
+          <Route path="don-hang" element={<AdminOrdersPage />} />
+          <Route path="san-pham" element={<AdminProductsPage />} />
+          <Route path="danh-muc" element={<AdminCategoriesPage />} />
+          <Route path="bo-suu-tap" element={<AdminCollectionsPage />} />
+          <Route path="tai-khoan" element={<AdminAccountsPage />} />
+          <Route path="role" element={<AdminRolesPage />} />
+        </Route>
+
         <Route element={<ShopLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/bo-suu-tap" element={<CatalogPage />} />
@@ -237,10 +256,14 @@ function ShopApp() {
 
 export default function App() {
   return (
-    <CartProvider>
-      <ToastProvider>
-        <ShopApp />
-      </ToastProvider>
-    </CartProvider>
+    <AuthProvider>
+      <CatalogProvider>
+        <CartProvider>
+          <ToastProvider>
+            <ShopApp />
+          </ToastProvider>
+        </CartProvider>
+      </CatalogProvider>
+    </AuthProvider>
   );
 }
