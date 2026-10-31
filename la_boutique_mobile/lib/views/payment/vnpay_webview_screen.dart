@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/payment_provider.dart';
 
 class VnpayWebviewScreen extends StatefulWidget {
   final String paymentUrl;
@@ -18,7 +23,8 @@ class VnpayWebviewScreen extends StatefulWidget {
 }
 
 class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
+  Timer? _webPollTimer;
   bool _isLoading = true;
   int _progress = 0;
   bool _hasRedirected = false;
@@ -26,7 +32,47 @@ class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
   @override
   void initState() {
     super.initState();
-    _initWebView();
+    if (kIsWeb) {
+      _startWebPolling();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openVnpayInBrowser();
+      });
+    } else {
+      _initWebView();
+    }
+  }
+
+  @override
+  void dispose() {
+    _webPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _openVnpayInBrowser() async {
+    try {
+      final uri = Uri.parse(widget.paymentUrl);
+      await launchUrl(uri, webOnlyWindowName: '_blank');
+    } catch (e) {
+      debugPrint('[VNPay Web] Error launching URL: $e');
+    }
+  }
+
+  void _startWebPolling() {
+    _webPollTimer?.cancel();
+    // Định kỳ poll mỗi 2.5s kiểm tra xem khách đã hoàn tất thanh toán trên tab VNPay chưa
+    _webPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final paymentProv = context.read<PaymentProvider>();
+      final status = await paymentProv.fetchPaymentStatus(widget.orderNumber);
+      if (!mounted) return;
+      if (status != null && !status.isPending) {
+        timer.cancel();
+        Navigator.of(context).pop(true);
+      }
+    });
   }
 
   void _initWebView() {
@@ -121,6 +167,172 @@ class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
     return result ?? false;
   }
 
+  Widget _buildWebPaymentView() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Container(
+            padding: const EdgeInsets.all(28.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+              border: Border.all(color: AppColors.sand200),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.clay500.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.payment_rounded,
+                    size: 38,
+                    color: AppColors.clay500,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Thanh toán VNPay Sandbox',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.ink,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Mã đơn hàng: #${widget.orderNumber}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mute,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.sand50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.sand200),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.clay500),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Cổng thanh toán VNPay đã được mở trong một tab mới của trình duyệt. Vui lòng thao tác thanh toán tại tab đó.',
+                              style: const TextStyle(fontSize: 13, height: 1.45, color: AppColors.ink),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: const [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.clay500),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Hệ thống đang tự động lắng nghe kết quả thanh toán...',
+                              style: TextStyle(fontSize: 12, color: AppColors.mute, fontStyle: FontStyle.italic),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.clay500,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                    label: const Text(
+                      'TÔI ĐÃ HOÀN TẤT THANH TOÁN',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                    ),
+                    onPressed: () {
+                      _webPollTimer?.cancel();
+                      Navigator.of(context).pop(true);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      side: const BorderSide(color: AppColors.sand300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: const Text(
+                      'MỞ LẠI TRANG VNPAY (NẾU BỊ CHẶN POPUP)',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                    onPressed: _openVnpayInBrowser,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    final shouldExit = await _showExitDialog();
+                    if (!mounted) return;
+                    if (shouldExit) {
+                      _webPollTimer?.cancel();
+                      Navigator.of(context).pop(false);
+                    }
+                  },
+                  child: const Text(
+                    'Hủy hoặc thanh toán sau',
+                    style: TextStyle(color: AppColors.mute, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -130,6 +342,7 @@ class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
         final shouldExit = await _showExitDialog();
         if (!context.mounted) return;
         if (shouldExit) {
+          _webPollTimer?.cancel();
           Navigator.of(context).pop(false);
         }
       },
@@ -158,19 +371,21 @@ class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
             onPressed: () async {
               final shouldExit = await _showExitDialog();
               if (!context.mounted) return;
-        if (shouldExit) {
+              if (shouldExit) {
+                _webPollTimer?.cancel();
                 Navigator.of(context).pop(false);
               }
             },
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              tooltip: 'Tải lại trang',
-              onPressed: () => _controller.reload(),
-            ),
+            if (!kIsWeb)
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'Tải lại trang',
+                onPressed: () => _controller?.reload(),
+              ),
           ],
-          bottom: _isLoading
+          bottom: (!kIsWeb && _isLoading)
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(2),
                   child: LinearProgressIndicator(
@@ -182,7 +397,11 @@ class _VnpayWebviewScreenState extends State<VnpayWebviewScreen> {
                 )
               : null,
         ),
-        body: WebViewWidget(controller: _controller),
+        body: kIsWeb
+            ? _buildWebPaymentView()
+            : (_controller != null
+                ? WebViewWidget(controller: _controller!)
+                : const SizedBox.shrink()),
       ),
     );
   }
