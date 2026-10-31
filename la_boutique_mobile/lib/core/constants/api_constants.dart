@@ -84,4 +84,10 @@ class ApiConstants {
 
   static const String collections = '/collections';
   static String collectionBySlug(String slug) => '/collections/slug/$slug';
+
+  // Payment endpoints (VNPay + trạng thái thanh toán)
+  static String paymentVnpay(String orderNumber) =>
+      '/payments/me/$orderNumber/vnpay';
+  static String paymentStatus(String orderNumber) =>
+      '/payments/me/$orderNumber';
 }

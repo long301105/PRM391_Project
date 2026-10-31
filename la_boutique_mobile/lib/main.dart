@@ -13,6 +13,7 @@ import 'providers/chat_provider.dart';
 import 'providers/collection_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/order_provider.dart';
+import 'providers/payment_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/store_provider.dart';
 import 'views/home/home_screen.dart';
@@ -33,6 +34,7 @@ class LaBoutiqueApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => CollectionProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),

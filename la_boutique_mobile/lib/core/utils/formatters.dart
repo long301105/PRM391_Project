@@ -15,6 +15,10 @@ class Formatters {
     return DateFormat('dd/MM/yyyy HH:mm').format(date);
   }
 
+  static String formatDateTime(DateTime date) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  }
+
   static String formatDateShort(DateTime date) {
     return DateFormat('dd/MM/yyyy').format(date);
   }

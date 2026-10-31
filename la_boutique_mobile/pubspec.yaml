@@ -49,6 +49,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   # Đăng nhập Google (GĐ 5)
   google_sign_in: ^6.2.1
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:

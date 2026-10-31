@@ -127,7 +127,7 @@ class OrderModel {
   String get paymentMethodText {
     final p = paymentMethod.toUpperCase();
     if (p == 'COD') return 'Thanh toán COD';
-    if (p == 'BANK_TRANSFER' || p == 'BANKING') return 'Chuyển khoản VietQR';
+    if (p == 'BANK_TRANSFER' || p == 'BANKING') return 'VNPay Sandbox';
     return paymentMethod;
   }
 

@@ -7,6 +7,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order.dart';
 import '../../providers/order_provider.dart';
+import '../../models/payment.dart';
+import '../../providers/payment_provider.dart';
+import '../payment/payment_result_screen.dart';
+import '../payment/vnpay_webview_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderNumber;
@@ -19,9 +23,10 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   OrderModel? _order;
+  PaymentStatusResponse? _paymentStatus;
   bool _isLoading = true;
   bool _isCancelling = false;
-
+  bool _isOpeningPayment = false;
   @override
   void initState() {
     super.initState();
@@ -31,11 +36,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _loadOrder() async {
     setState(() => _isLoading = true);
     final order = await context.read<OrderProvider>().fetchOrderDetail(widget.orderNumber);
+    PaymentStatusResponse? payment;
+    if (order != null && (order.paymentMethod == 'BANK_TRANSFER' || order.paymentMethod == 'BANKING')) {
+      if (!mounted) return;
+      payment = await context.read<PaymentProvider>().fetchPaymentStatus(widget.orderNumber);
+    }
     if (mounted) {
       setState(() {
         _order = order;
+        _paymentStatus = payment;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _openVnpayPayment() async {
+    setState(() => _isOpeningPayment = true);
+    final paymentProv = context.read<PaymentProvider>();
+    final vnpayResp = await paymentProv.createVnpayPayment(widget.orderNumber);
+
+    if (!mounted) return;
+    setState(() => _isOpeningPayment = false);
+
+    if (vnpayResp != null) {
+      final completed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VnpayWebviewScreen(
+            paymentUrl: vnpayResp.paymentUrl,
+            orderNumber: widget.orderNumber,
+          ),
+        ),
+      );
+
+      if (completed == true && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaymentResultScreen(orderNumber: widget.orderNumber),
+          ),
+        );
+        if (mounted) {
+          _loadOrder();
+        }
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(paymentProv.errorMessage ?? 'Không thể mở liên kết thanh toán VNPay.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -470,6 +522,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             const SizedBox(height: 14),
 
+            _buildPaymentSection(order),
+
             if (order.canCustomerCancel) ...[
               SizedBox(
                 width: double.infinity,
@@ -565,6 +619,124 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+  Widget _buildPaymentSection(OrderModel order) {
+    final isVnpay = order.paymentMethod == 'BANK_TRANSFER' ||
+        order.paymentMethod == 'BANKING' ||
+        order.paymentMethod.toUpperCase() == 'VNPAY';
+
+    if (!isVnpay) return const SizedBox.shrink();
+
+    final payment = _paymentStatus;
+    final isPaid = payment?.isPaid ?? false;
+    final isExpired = (payment?.isExpired ?? false) || order.status.toUpperCase() == 'CANCELLED';
+    final isFailed = payment?.isFailed ?? false;
+    final canPay = order.status.toUpperCase() == 'PENDING' && !isPaid && !isExpired;
+
+    Color badgeBg;
+    Color badgeText;
+    String statusTitle;
+    IconData statusIcon;
+
+    if (isPaid) {
+      badgeBg = Colors.green.shade50;
+      badgeText = Colors.green.shade700;
+      statusTitle = 'ĐÃ THANH TOÁN THÀNH CÔNG';
+      statusIcon = Icons.check_circle_rounded;
+    } else if (isExpired) {
+      badgeBg = Colors.grey.shade100;
+      badgeText = Colors.grey.shade700;
+      statusTitle = 'HẾT HẠN THANH TOÁN';
+      statusIcon = Icons.timer_off_outlined;
+    } else if (isFailed) {
+      badgeBg = Colors.red.shade50;
+      badgeText = Colors.red.shade700;
+      statusTitle = 'THANH TOÁN THẤT BẠI';
+      statusIcon = Icons.error_outline_rounded;
+    } else {
+      badgeBg = Colors.amber.shade50;
+      badgeText = Colors.amber.shade900;
+      statusTitle = 'CHỜ THANH TOÁN (HẠN 15 PHÚT)';
+      statusIcon = Icons.timer_outlined;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.sand200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.account_balance_wallet_outlined, color: AppColors.clay500, size: 18),
+              const SizedBox(width: 8),
+              const Text('CỔNG VNPAY SANDBOX', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.ink)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon, size: 13, color: badgeText),
+                    const SizedBox(width: 4),
+                    Text(
+                      statusTitle,
+                      style: TextStyle(color: badgeText, fontWeight: FontWeight.bold, fontSize: 10.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isPaid) ...[
+            if (payment?.bankCode != null && payment!.bankCode!.isNotEmpty)
+              Text('Ngân hàng: ${payment.bankCode}', style: const TextStyle(fontSize: 12.5, color: AppColors.mute)),
+            if (payment?.paidAt != null)
+              Text('Thời gian thanh toán: ${Formatters.formatDateTime(payment!.paidAt!)}', style: const TextStyle(fontSize: 12, color: AppColors.mute)),
+          ] else if (canPay) ...[
+            const Text(
+              'Đơn hàng đang chờ thanh toán qua cổng VNPay. Vui lòng hoàn tất trong vòng 15 phút từ lúc đặt đơn.',
+              style: TextStyle(fontSize: 12, color: AppColors.mute, height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.clay500,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _isOpeningPayment ? null : _openVnpayPayment,
+                icon: _isOpeningPayment
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.payment_rounded, size: 18),
+                label: Text(
+                  _isOpeningPayment ? 'ĐANG MỞ CỔNG...' : (isFailed ? 'THỬ LẠI THANH TOÁN VNPAY' : 'THANH TOÁN VNPAY NGAY'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          ] else if (isExpired) ...[
+            const Text(
+              'Đã quá thời hạn 15 phút. Đơn hàng không còn hiệu lực thanh toán.',
+              style: TextStyle(fontSize: 12, color: AppColors.mute, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
       ),
     );
   }
