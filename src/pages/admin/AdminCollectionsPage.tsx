@@ -172,7 +172,7 @@ export function AdminCollectionsPage() {
     input.accept = "image/*";
     input.onchange = () => {
       const file = input.files?.[0];
-      if (file) void runOnCurrent(() => adminCollections.uploadCover(current.id, file));
+      if (file) void runOnCurrent(() => adminCollections.uploadCover(current.id, file, current.version));
     };
     input.click();
   };

@@ -1,6 +1,12 @@
+import 'dart:async';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/api_constants.dart';
+import '../../models/collection.dart';
+import '../../models/product.dart';
+import '../../services/api_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
@@ -10,28 +16,102 @@ import '../widgets/shimmer_loading.dart';
 
 class ProductListScreen extends StatefulWidget {
   final String? initialCategory;
+  final bool isActive;
 
-  const ProductListScreen({super.key, this.initialCategory});
+  const ProductListScreen({super.key, this.initialCategory, this.isActive = true});
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
 }
 
-class _ProductListScreenState extends State<ProductListScreen> {
+class _ProductListScreenState extends State<ProductListScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
+  final ApiService _collectionApi = ApiService();
+  List<CollectionModel> _publicCollections = const [];
+  Timer? _collectionTimer;
+  bool _refreshingCollections = false;
+  bool _foreground = true;
+  bool _initialSelectionPending = true;
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialCategory != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<ProductProvider>().setCategory(widget.initialCategory!);
-      });
+  bool get _canRefresh => mounted && widget.isActive && _foreground &&
+      (ModalRoute.of(context)?.isCurrent ?? true);
+
+  Future<void> _refreshCollections() async {
+    if (!_canRefresh || _refreshingCollections) return;
+    _refreshingCollections = true;
+    try {
+      final fetched = <CollectionModel>[];
+      var page = 0;
+      var totalPages = 1;
+      do {
+        final response = await _collectionApi.get(
+          ApiConstants.collections,
+          queryParams: {'page': page, 'size': 100, 'sort': 'createdAt,desc'},
+          requiresAuth: false,
+        );
+        if (response is! Map<String, dynamic> || response['content'] is! List ||
+            response['totalPages'] is! num) {
+          throw StateError('Invalid collection page');
+        }
+        fetched.addAll((response['content'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(CollectionModel.fromJson));
+        totalPages = (response['totalPages'] as num).toInt();
+        page++;
+      } while (page < totalPages);
+      if (!mounted || !_canRefresh) return;
+      final provider = context.read<ProductProvider>();
+      setState(() => _publicCollections = fetched);
+      if (_initialSelectionPending) {
+        _initialSelectionPending = false;
+        final initial = widget.initialCategory;
+        if (initial == 'sunset') {
+          if (fetched.any((item) => item.slug == initial)) {
+            provider.selectPublicCollection(initial!);
+          } else {
+            provider.setCategory('all');
+          }
+        } else if (initial != null) {
+          provider.setCategory(initial);
+        }
+      }
+      final selected = provider.publicCollectionSlug;
+      if (selected != null && !fetched.any((item) => item.slug == selected)) {
+        provider.setCategory('all');
+      }
+    } catch (e) {
+      debugPrint('[PublicCollections] refresh failed: $e');
+    } finally {
+      _refreshingCollections = false;
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) _refreshCollections();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshCollections());
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshCollections());
+    _collectionTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshCollections());
+  }
+
+  @override
   void dispose() {
+    _collectionTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
@@ -195,22 +275,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
                             setSheetState(() => tempCollection = null);
                           },
                         ),
-                        _buildFilterOptionChip(
-                          label: 'Sunset SS26 🌅',
-                          isSelected: tempCollection == 'SUNSET',
+                        ..._publicCollections.map((collection) => _buildFilterOptionChip(
+                          label: collection.collectionName,
+                          isSelected: tempCollection == collection.slug,
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            setSheetState(() => tempCollection = (tempCollection == 'SUNSET' ? null : 'SUNSET'));
+                            setSheetState(() => tempCollection =
+                                tempCollection == collection.slug ? null : collection.slug);
                           },
-                        ),
-                        _buildFilterOptionChip(
-                          label: 'Cơ bản (Regular)',
-                          isSelected: tempCollection == 'REGULAR',
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setSheetState(() => tempCollection = (tempCollection == 'REGULAR' ? null : 'REGULAR'));
-                          },
-                        ),
+                        )),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -335,13 +408,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final products = productProvider.filteredProducts;
     final hasPriceFilter = productProvider.minPrice != null || productProvider.maxPrice != null;
     final hasSizeFilter = productProvider.selectedSize != null && productProvider.selectedSize != 'all';
-    final hasCollectionFilter = productProvider.selectedCollection != null && productProvider.selectedCollection != 'all';
     final hasMaterialFilter = productProvider.selectedMaterial != null && productProvider.selectedMaterial!.isNotEmpty;
-    final isAnyFilterActive = hasPriceFilter || hasSizeFilter || hasCollectionFilter || hasMaterialFilter;
+    final isAnyFilterActive = hasPriceFilter || hasSizeFilter || hasMaterialFilter;
 
     final List<Map<String, String>> categories = [
       {'id': 'all', 'label': 'Tất cả'},
-      {'id': 'sunset', 'label': 'Sunset SS26 🌅'},
+      ..._publicCollections.map((item) => {
+        'id': 'collection:${item.slug}',
+        'label': item.collectionName,
+      }),
     ];
 
     if (productProvider.categories.isNotEmpty) {
@@ -355,9 +430,41 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ]);
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.sand50,
+    final selectedSlug = productProvider.publicCollectionSlug;
+    CollectionModel? selectedCollection;
+    for (final collection in _publicCollections) {
+      if (collection.slug == selectedSlug) selectedCollection = collection;
+    }
+    final cover = selectedCollection?.coverImageUrl;
+
+    return Stack(
+      children: [
+        Positioned.fill(child: ColoredBox(color: AppColors.sand50)),
+        if (cover != null && cover.isNotEmpty)
+          Positioned(
+            top: 0, left: 0, right: 0, height: 340,
+            child: IgnorePointer(
+              child: ClipRect(
+                child: Stack(fit: StackFit.expand, children: [
+                  ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                    child: cover.startsWith('http')
+                        ? Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink())
+                        : Image.asset(Product.resolveImage(cover), fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                  ),
+                  const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Color(0x85FAF8F5), Color(0xADFAF8F5), AppColors.sand50],
+                    stops: [0, 0.55, 1],
+                  ))),
+                ]),
+              ),
+            ),
+          ),
+        Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: const Text('LA BOUTIQUE VN'),
         actions: [
           Stack(
@@ -486,13 +593,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: categories.map((cat) {
-                final isSelected = productProvider.selectedCategory == cat['id'];
+                final id = cat['id']!;
+                final isCollection = id.startsWith('collection:');
+                final isSelected = isCollection
+                    ? productProvider.publicCollectionSlug == id.substring('collection:'.length)
+                    : productProvider.publicCollectionSlug == null && productProvider.selectedCategory == id;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     label: Text(cat['label']!),
                     selected: isSelected,
-                    onSelected: (_) => productProvider.setCategory(cat['id']!),
+                    onSelected: (_) {
+                      if (isCollection) {
+                        productProvider.selectPublicCollection(id.substring('collection:'.length));
+                      } else {
+                        productProvider.setCategory(id);
+                      }
+                    },
                     selectedColor: AppColors.clay500,
                     backgroundColor: AppColors.white,
                     labelStyle: TextStyle(
@@ -535,14 +652,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       onRemove: () {
                         HapticFeedback.lightImpact();
                         productProvider.setSizeFilter(null);
-                      },
-                    ),
-                  if (hasCollectionFilter)
-                    _buildActiveTag(
-                      label: 'BST: ${productProvider.selectedCollection == 'SUNSET' ? 'Sunset 🌅' : 'Cơ bản'}',
-                      onRemove: () {
-                        HapticFeedback.lightImpact();
-                        productProvider.setCollectionFilter(null);
                       },
                     ),
                   if (hasMaterialFilter)
@@ -650,6 +759,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
+        ),
+      ],
     );
   }
 

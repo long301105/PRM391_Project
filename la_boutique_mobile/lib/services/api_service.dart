@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../core/constants/api_constants.dart';
@@ -163,12 +165,26 @@ class ApiService {
     String path, {
     required String filePath,
     String field = 'file',
+    List<int>? fileBytes,
+    String? fileName,
+    Map<String, dynamic>? metadata,
   }) async {
     Future<FormData> buildForm() async => FormData.fromMap({
-          field: await MultipartFile.fromFile(
-            filePath,
-            filename: filePath.split(RegExp(r'[\\/]')).last,
-          ),
+          if (metadata != null)
+            'metadata': MultipartFile.fromString(
+              jsonEncode(metadata),
+              contentType: DioMediaType('application', 'json'),
+            ),
+          field: fileBytes != null
+              ? MultipartFile.fromBytes(
+                  fileBytes,
+                  filename: fileName,
+                  contentType: DioMediaType('application', 'octet-stream'),
+                )
+              : await MultipartFile.fromFile(
+                  filePath,
+                  filename: filePath.split(RegExp(r'[\\/]')).last,
+                ),
         });
 
     Future<Response<dynamic>> call() async => _dio.request(

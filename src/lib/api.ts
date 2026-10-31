@@ -124,9 +124,12 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
   del: <T>(path: string, query?: Query) => request<T>("DELETE", path, { query }),
-  upload: <T>(method: "POST" | "PUT", path: string, file: File, field = "file") => {
+  upload: <T>(method: "POST" | "PUT", path: string, file: File, field = "file", metadata?: unknown) => {
     const form = new FormData();
     form.append(field, file);
+    if (metadata !== undefined) {
+      form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    }
     return request<T>(method, path, { body: form, isFormData: true });
   },
 };

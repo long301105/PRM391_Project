@@ -166,8 +166,8 @@ export const adminCollections = {
   replaceProducts: (id: string, body: { expectedVersion: number; productIds: string[] }) =>
     api.put<CollectionDetailResponse>(`/collections/admin/${id}/products`, body),
 
-  uploadCover: (id: string, file: File) =>
-    api.upload<CollectionDetailResponse>("PUT", `/collections/admin/${id}/cover`, file),
+  uploadCover: (id: string, file: File, expectedVersion: number) =>
+    api.upload<CollectionDetailResponse>("PUT", `/collections/admin/${id}/cover`, file, "file", { expectedVersion }),
 
   publish: (id: string, expectedVersion: number) =>
     api.patch<CollectionDetailResponse>(`/collections/admin/${id}/publish`, { expectedVersion }),

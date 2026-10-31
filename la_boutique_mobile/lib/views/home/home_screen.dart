@@ -47,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final tabs = [
       _HomeTab(onExplore: _onExplorePressed),
-      const ProductListScreen(),
+      ProductListScreen(isActive: _currentIndex == 1),
       const StoreMapScreen(),
       const NotificationScreen(),
       const ProfileScreen(),

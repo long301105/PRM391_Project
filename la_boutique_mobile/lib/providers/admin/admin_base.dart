@@ -29,8 +29,9 @@ abstract class AdminProviderBase extends ChangeNotifier {
     } on ApiException catch (e) {
       _errorMessage = e.message;
       return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[$runtimeType] $e');
+      debugPrintStack(stackTrace: stackTrace);
       _errorMessage = fallbackMessage ?? 'Thao tác không thành công. Vui lòng thử lại.';
       return null;
     } finally {
