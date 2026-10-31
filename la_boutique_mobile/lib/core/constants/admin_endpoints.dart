@@ -51,4 +51,15 @@ class AdminEndpoints {
   static String orderByNumber(String orderNumber) => '/orders/number/$orderNumber';
 
   static String orderStatus(String id) => '/orders/$id/status';
+
+  // --- Hội thoại (chat) phía admin ---
+  static const String conversations = '/conversations/admin';
+
+  static const String conversationsUnreadCount = '/conversations/admin/unread-count';
+
+  static String conversationMessages(String id) => '/conversations/admin/$id/messages';
+
+  static String conversationMessagesNew(String id) => '/conversations/admin/$id/messages/new';
+
+  static String conversationRead(String id) => '/conversations/admin/$id/read';
 }
