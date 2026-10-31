@@ -145,29 +145,21 @@ class _AdminCollectionFormScreenState extends State<AdminCollectionFormScreen> {
   }
 
   Future<void> _uploadCover() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 92);
-    if (picked == null || !mounted) return;
-
-    final provider = context.read<AdminCollectionProvider>();
-    final collection = _current;
-    final version = collection?.version;
-    if (collection == null || collection.id != _collectionId || version == null) {
-      adminToast(context, 'Thiếu số hiệu phiên bản. Hãy tải lại bộ sưu tập.', success: false);
-      return;
-    }
+    if (_busyCover) return;
     setState(() => _busyCover = true);
     try {
-      // Browser XFile paths are blob URLs, not file-system paths.
-      List<int>? bytes;
-      try {
-        bytes = kIsWeb ? await picked.readAsBytes() : null;
-      } catch (e) {
-        debugPrint('[AdminCollectionForm] Could not read cover image: $e');
-        if (mounted) {
-          adminToast(context, 'Không đọc được ảnh đã chọn. Vui lòng thử lại.', success: false);
-        }
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 92);
+      if (picked == null || !mounted) return;
+
+      final provider = context.read<AdminCollectionProvider>();
+      final collection = _current;
+      final version = collection?.version;
+      if (collection == null || collection.id != _collectionId || version == null) {
+        adminToast(context, 'Thiếu số hiệu phiên bản. Hãy tải lại bộ sưu tập.', success: false);
         return;
       }
+      // Browser XFile paths are blob URLs, not file-system paths.
+      final bytes = kIsWeb ? await picked.readAsBytes() : null;
       if (!mounted) return;
       await adminRun(
         context,
@@ -181,6 +173,12 @@ class _AdminCollectionFormScreenState extends State<AdminCollectionFormScreen> {
         ),
         successMessage: 'Đã cập nhật ảnh bìa.',
       );
+    } catch (error, stackTrace) {
+      debugPrint('[AdminCollectionForm] Could not select or upload cover: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        adminToast(context, 'Không thể chọn hoặc tải ảnh lên. Vui lòng thử lại.', success: false);
+      }
     } finally {
       if (mounted) setState(() => _busyCover = false);
     }

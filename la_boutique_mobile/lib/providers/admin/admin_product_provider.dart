@@ -1,5 +1,6 @@
 import '../../core/constants/admin_endpoints.dart';
 import '../../models/admin_models.dart';
+import '../../services/product_upload.dart' show ProductUploadImage;
 import 'admin_base.dart';
 
 class AdminProductProvider extends AdminProviderBase {
@@ -104,10 +105,11 @@ class AdminProductProvider extends AdminProviderBase {
     bool isFeatured = false,
     String? status,
     required String categoryId,
+    List<ProductUploadImage> images = const [],
+    int? thumbnailIndex,
   }) async {
-    final result = await guard(() => api.post(
-          AdminEndpoints.products,
-          body: _productBody(
+    final result = await guard(() => api.createProductMultipart(
+          metadata: _productBody(
             name: name,
             slug: slug,
             sku: sku,
@@ -124,6 +126,8 @@ class AdminProductProvider extends AdminProviderBase {
             categoryId: categoryId,
             isCreate: true,
           ),
+          images: images,
+          thumbnailIndex: thumbnailIndex,
         ));
 
     if (result is Map<String, dynamic>) {
@@ -228,22 +232,34 @@ class AdminProductProvider extends AdminProviderBase {
     return true;
   }
 
-  Future<bool> addImage(String productId, String filePath) async {
+  Future<bool> addImage(
+    String productId, String filePath, {
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
     final result = await guard(() => api.sendFile(
           'POST',
           AdminEndpoints.productImages(productId),
           filePath: filePath,
+          fileBytes: fileBytes,
+          fileName: fileName,
         ));
     if (result == null) return false;
     await fetchProduct(productId);
     return true;
   }
 
-  Future<bool> replaceImage(String productId, String imageId, String filePath) async {
+  Future<bool> replaceImage(
+    String productId, String imageId, String filePath, {
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
     final result = await guard(() => api.sendFile(
           'PUT',
           AdminEndpoints.productImage(productId, imageId),
           filePath: filePath,
+          fileBytes: fileBytes,
+          fileName: fileName,
         ));
     if (result == null) return false;
     await fetchProduct(productId);
@@ -257,11 +273,17 @@ class AdminProductProvider extends AdminProviderBase {
     return true;
   }
 
-  Future<bool> uploadThumbnail(String productId, String filePath) async {
+  Future<bool> uploadThumbnail(
+    String productId, String filePath, {
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
     final result = await guard(() => api.sendFile(
           'PUT',
           AdminEndpoints.productThumbnailUpload(productId),
           filePath: filePath,
+          fileBytes: fileBytes,
+          fileName: fileName,
         ));
     if (result == null) return false;
     await fetchProduct(productId);

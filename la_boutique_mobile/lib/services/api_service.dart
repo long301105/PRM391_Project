@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/api_exception.dart';
 import '../core/storage/token_store.dart';
+import 'product_upload.dart';
 
 /// Lớp mạng trung tâm của app, dựng trên **Dio**.
 /// Giữ nguyên interface cũ (`get/post/patch/delete`, `setTokens`, `clearTokens`...) để các
@@ -213,6 +214,46 @@ class ApiService {
     } on DioException catch (e) {
       debugPrint('[ApiService] upload error: ${e.message}');
       throw ApiException(statusCode: 0, message: 'Không tải được ảnh lên. Vui lòng kiểm tra mạng.');
+    }
+  }
+
+  /// Product creation uses repeated `images` parts (not `images[]`).
+  /// Rebuild FormData after a 401 because multipart streams are single-use.
+  Future<dynamic> createProductMultipart({
+    required Map<String, dynamic> metadata,
+    required List<ProductUploadImage> images,
+    int? thumbnailIndex,
+  }) async {
+
+    Future<Response<dynamic>> call() async => _dio.request(
+          '/products/admin',
+          data: await buildProductUploadForm(metadata, images),
+          queryParameters: thumbnailIndex == null ? null : {'thumbnailIndex': thumbnailIndex},
+          options: Options(
+            method: 'POST',
+            contentType: 'multipart/form-data',
+            sendTimeout: const Duration(minutes: 3),
+            receiveTimeout: const Duration(minutes: 3),
+            headers: (_accessToken?.isNotEmpty ?? false)
+                ? {'Authorization': 'Bearer $_accessToken'}
+                : null,
+          ),
+        );
+
+    try {
+      var resp = await call();
+      if (resp.statusCode == 401 && (_refreshToken?.isNotEmpty ?? false)) {
+        if (await _attemptRefreshToken()) resp = await call();
+      }
+      return _processResponse(resp);
+    } on ApiException {
+      rethrow;
+    } on DioException catch (e) {
+      debugPrint('[ApiService] create product upload error: ${e.message}');
+      throw ApiException(
+        statusCode: 0,
+        message: 'Không xác nhận được kết quả tạo sản phẩm. Hãy kiểm tra SKU trong danh sách trước khi thử lại.',
+      );
     }
   }
 
