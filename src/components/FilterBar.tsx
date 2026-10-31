@@ -64,6 +64,7 @@ interface PriceRange {
 }
 
 interface FilterSidebarProps {
+  categoryOptions?: { id: string; label: string; fullLabel: string }[];
   category: string;
   onCategory: (v: string) => void;
   search: string;
@@ -125,6 +126,7 @@ function DualRange({
 }
 
 export function FilterSidebar({
+  categoryOptions = CATALOG_CATEGORIES,
   category,
   onCategory,
   search,
@@ -281,9 +283,9 @@ export function FilterSidebar({
               Danh mục sản phẩm
             </p>
             <div className="space-y-1">
-              {CATALOG_CATEGORIES.map((c) => {
+              {categoryOptions.map((c) => {
                 const active = category === c.id;
-                const count = categoryCounts[c.id] || 0;
+                const count = categoryCounts[c.id];
                 return (
                   <button
                     key={c.id}
@@ -296,14 +298,14 @@ export function FilterSidebar({
                     )}
                   >
                     <span>{c.fullLabel}</span>
-                    <span
+                    {count !== undefined && <span
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[10px]",
                         active ? "bg-white/20 text-white" : "bg-sand-100 text-mute"
                       )}
                     >
                       {count}
-                    </span>
+                    </span>}
                   </button>
                 );
               })}
@@ -399,9 +401,9 @@ export function FilterSidebar({
 
           {/* Mobile Categories Vertical List on Left */}
           <div className="space-y-1 pt-1 border-t border-sand-100">
-            {CATALOG_CATEGORIES.map((c) => {
+            {categoryOptions.map((c) => {
               const active = category === c.id;
-              const count = categoryCounts[c.id] || 0;
+              const count = categoryCounts[c.id];
               return (
                 <button
                   key={c.id}
@@ -414,14 +416,14 @@ export function FilterSidebar({
                   )}
                 >
                   <span className="text-[10px] font-bold leading-tight line-clamp-1">{c.label}</span>
-                  <span
+                  {count !== undefined && <span
                     className={cn(
                       "mt-0.5 rounded-full px-1.5 py-0.2 text-[9px]",
                       active ? "bg-white/25 text-white" : "bg-sand-100 text-mute"
                     )}
                   >
                     {count}
-                  </span>
+                  </span>}
                 </button>
               );
             })}

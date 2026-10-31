@@ -38,6 +38,8 @@ export function Header({ onOpenCart, onOpenWishlist, onOpenLookup, forceSolid = 
   }, []);
 
   const isSolid = forceSolid || scrolled;
+  const collectionBackdrop = location.pathname.startsWith("/bo-suu-tap") &&
+    (new URLSearchParams(location.search).has("bst") || location.pathname === "/bo-suu-tap/sunset");
   const light = !isSolid;
 
   const goStory = (e: ReactMouseEvent<HTMLAnchorElement>) => {
@@ -53,7 +55,9 @@ export function Header({ onOpenCart, onOpenWishlist, onOpenLookup, forceSolid = 
         className={cn(
           "h-16 transition-all duration-300",
           isSolid
-            ? "border-b border-sand-200 bg-sand-50/95 shadow-sm backdrop-blur-md"
+            ? collectionBackdrop && !scrolled
+              ? "border-b border-sand-200/40 bg-sand-50/25 shadow-none backdrop-blur-sm"
+              : "border-b border-sand-200 bg-sand-50/95 shadow-sm backdrop-blur-md"
             : "border-b border-transparent bg-transparent shadow-none backdrop-blur-none"
         )}
       >

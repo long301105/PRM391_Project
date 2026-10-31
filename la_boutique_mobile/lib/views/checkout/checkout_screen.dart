@@ -390,51 +390,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             value: 'BANKING',
                             activeColor: AppColors.clay500,
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('Chuyển khoản VietQR 24/7', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            subtitle: const Text('Quét mã QR tự động điền số tiền và nội dung chuyển khoản', style: TextStyle(fontSize: 12, color: AppColors.mute)),
+                            title: const Text('Thanh toán qua VNPay Sandbox', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Mở cổng VNPay — hỗ trợ thẻ ATM nội địa, Visa, MasterCard', style: TextStyle(fontSize: 12, color: AppColors.mute)),
                           ),
                         ],
                       ),
                     ),
 
-                    // Dynamic VietQR Box
+                    // Dynamic VNPay Sandbox Box
                     if (_paymentMethod == 'BANKING') ...[
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.clay50,
+                          color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.clay200),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Quét mã QR để chuyển khoản nhanh:',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.clay700),
+                            Row(
+                              children: [
+                                Icon(Icons.payment_rounded, color: Colors.blue.shade800, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Cổng thanh toán VNPay Sandbox',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Colors.blue.shade900),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.sand300),
-                              ),
-                              child: Column(
-                                children: [
-                                  Image.network(
-                                    'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=LA_BOUTIQUE_VN_ORDER_${cart.totalAmount.toInt()}',
-                                    width: 140,
-                                    height: 140,
-                                    errorBuilder: (_, _, _) => const Icon(Icons.qr_code_2, size: 100, color: AppColors.ink),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Text('Ngân hàng: MBBank', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  const Text('Số TK: 0901234567', style: TextStyle(fontSize: 11, color: AppColors.clay600, fontWeight: FontWeight.bold)),
-                                  const Text('Chủ TK: LA BOUTIQUE VN', style: TextStyle(fontSize: 11)),
-                                ],
-                              ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '• Sau khi xác nhận đơn, bạn sẽ được chuyển tới cổng VNPay để nhập thông tin thẻ test.\n• Hạn thanh toán: 15 phút từ lúc đặt đơn (quá hạn đơn sẽ tự huỷ).',
+                              style: TextStyle(fontSize: 12, color: AppColors.ink, height: 1.4),
                             ),
                           ],
                         ),

@@ -10,6 +10,7 @@ import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
 import '../chat/chat_screen.dart';
 import '../admin/admin_home_screen.dart';
+import '../admin/admin_conversations_screen.dart';
 import '../collection/collection_list_screen.dart';
 import '../map/store_map_screen.dart';
 import '../notification/notification_screen.dart';
@@ -47,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final tabs = [
       _HomeTab(onExplore: _onExplorePressed),
-      const ProductListScreen(),
+      ProductListScreen(isActive: _currentIndex == 1),
       const StoreMapScreen(),
       const NotificationScreen(),
       const ProfileScreen(),
@@ -225,7 +226,15 @@ class _HomeTabState extends State<_HomeTab> {
             icon: const Icon(Icons.chat_outlined),
             tooltip: 'Tư vấn trực tuyến',
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+              // Admin bấm icon chat -> vào hộp thư hội thoại khách; khách thường -> chat với shop.
+              final isAdmin =
+                  (context.read<AuthProvider>().accountInfo?.roleName ?? '').toUpperCase() == 'ADMIN';
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => isAdmin ? const AdminConversationsScreen() : const ChatScreen(),
+                ),
+              );
             },
           ),
           Stack(

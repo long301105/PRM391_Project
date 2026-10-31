@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -148,14 +149,41 @@ class _AdminCollectionFormScreenState extends State<AdminCollectionFormScreen> {
     if (picked == null || !mounted) return;
 
     final provider = context.read<AdminCollectionProvider>();
+    final collection = _current;
+    final version = collection?.version;
+    if (collection == null || collection.id != _collectionId || version == null) {
+      adminToast(context, 'Thiếu số hiệu phiên bản. Hãy tải lại bộ sưu tập.', success: false);
+      return;
+    }
     setState(() => _busyCover = true);
-    await adminRun(
-      context,
-      provider,
-      () => provider.uploadCover(_collectionId!, picked.path),
-      successMessage: 'Đã cập nhật ảnh bìa.',
-    );
-    if (mounted) setState(() => _busyCover = false);
+    try {
+      // Browser XFile paths are blob URLs, not file-system paths.
+      List<int>? bytes;
+      try {
+        bytes = kIsWeb ? await picked.readAsBytes() : null;
+      } catch (e) {
+        debugPrint('[AdminCollectionForm] Could not read cover image: $e');
+        if (mounted) {
+          adminToast(context, 'Không đọc được ảnh đã chọn. Vui lòng thử lại.', success: false);
+        }
+        return;
+      }
+      if (!mounted) return;
+      await adminRun(
+        context,
+        provider,
+        () => provider.uploadCover(
+          collection.id,
+          picked.path,
+          expectedVersion: version,
+          fileBytes: bytes,
+          fileName: kIsWeb ? picked.name : null,
+        ),
+        successMessage: 'Đã cập nhật ảnh bìa.',
+      );
+    } finally {
+      if (mounted) setState(() => _busyCover = false);
+    }
   }
 
   Future<void> _togglePublish() async {

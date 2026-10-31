@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/admin/admin_account_provider.dart';
 import 'providers/admin/admin_category_provider.dart';
 import 'providers/admin/admin_collection_provider.dart';
+import 'providers/admin/admin_conversation_provider.dart';
 import 'providers/admin/admin_order_provider.dart';
 import 'providers/admin/admin_product_provider.dart';
 import 'providers/admin/admin_role_provider.dart';
@@ -13,6 +14,7 @@ import 'providers/chat_provider.dart';
 import 'providers/collection_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/order_provider.dart';
+import 'providers/payment_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/store_provider.dart';
 import 'views/home/home_screen.dart';
@@ -33,6 +35,7 @@ class LaBoutiqueApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => CollectionProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
@@ -43,6 +46,7 @@ class LaBoutiqueApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AdminCategoryProvider()),
         ChangeNotifierProvider(create: (_) => AdminCollectionProvider()),
         ChangeNotifierProvider(create: (_) => AdminOrderProvider()),
+        ChangeNotifierProvider(create: (_) => AdminConversationProvider()),
       ],
       child: MaterialApp(
         title: 'La Boutique VN',

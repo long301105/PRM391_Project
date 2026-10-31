@@ -26,4 +26,6 @@ class ApiEndpoints {
   static const String products = '/products';
   static const String orders = '/orders';
   static const String myOrders = '/orders/me';
+  static String paymentVnpay(String orderNumber) => '/payments/me/$orderNumber/vnpay';
+  static String paymentStatus(String orderNumber) => '/payments/me/$orderNumber';
 }

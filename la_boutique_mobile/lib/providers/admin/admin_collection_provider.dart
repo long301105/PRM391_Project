@@ -87,11 +87,20 @@ class AdminCollectionProvider extends AdminProviderBase {
     return await _afterWrite(id, result);
   }
 
-  Future<bool> uploadCover(String id, String filePath) async {
+  Future<bool> uploadCover(
+    String id,
+    String filePath, {
+    required int expectedVersion,
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
     final result = await guard(() => api.sendFile(
           'PUT',
           AdminEndpoints.collectionCover(id),
           filePath: filePath,
+          fileBytes: fileBytes,
+          fileName: fileName,
+          metadata: {'expectedVersion': expectedVersion},
         ));
     return await _afterWrite(id, result);
   }

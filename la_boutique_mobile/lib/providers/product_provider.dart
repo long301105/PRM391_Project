@@ -11,13 +11,15 @@ class ProductProvider extends ChangeNotifier {
   List<Product> _products = [];
   List<CategoryModel> _categories = [];
   bool _isLoading = false;
-  String _selectedCategory = 'all'; // 'all', 'sunset', 'ao', 'quan'
+  String _selectedCategory = 'all';
+  String? _publicCollectionSlug;
+  int _productRequest = 0;
+  String _lastProductsQuery = 'all|';
   String _searchQuery = '';
   String _sortBy = 'newest'; // 'newest', 'price_asc', 'price_desc'
   double? _minPrice;
   double? _maxPrice;
   String? _selectedSize; // null or 'S', 'M', 'L'
-  String? _selectedCollection; // null or 'SUNSET', 'REGULAR'
   String? _selectedMaterial; // null or một từ khóa trong materialOptions
   final Set<String> _wishlistIds = {};
 
@@ -29,12 +31,13 @@ class ProductProvider extends ChangeNotifier {
   List<CategoryModel> get categories => _categories;
   bool get isLoading => _isLoading;
   String get selectedCategory => _selectedCategory;
+  String? get publicCollectionSlug => _publicCollectionSlug;
   String get searchQuery => _searchQuery;
   String get sortBy => _sortBy;
   double? get minPrice => _minPrice;
   double? get maxPrice => _maxPrice;
   String? get selectedSize => _selectedSize;
-  String? get selectedCollection => _selectedCollection;
+  String? get selectedCollection => _publicCollectionSlug;
   String? get selectedMaterial => _selectedMaterial;
   Set<String> get wishlistIds => _wishlistIds;
 
@@ -61,7 +64,15 @@ class ProductProvider extends ChangeNotifier {
   }
 
   void setCategory(String category) {
+    _publicCollectionSlug = null;
     _selectedCategory = category;
+    notifyListeners();
+    fetchProducts();
+  }
+
+  void selectPublicCollection(String slug) {
+    _publicCollectionSlug = slug;
+    _selectedCategory = 'all';
     notifyListeners();
     fetchProducts();
   }
@@ -90,8 +101,9 @@ class ProductProvider extends ChangeNotifier {
   }
 
   void setCollectionFilter(String? collection) {
-    _selectedCollection = collection;
+    _publicCollectionSlug = collection;
     notifyListeners();
+    fetchProducts();
   }
 
   void setMaterialFilter(String? material) {
@@ -107,24 +119,27 @@ class ProductProvider extends ChangeNotifier {
     String? collection,
     String? material,
   }) {
-    if (category != null) _selectedCategory = category;
+    if (category != null) {
+      _selectedCategory = category;
+      _publicCollectionSlug = null;
+    }
     _minPrice = minPrice;
     _maxPrice = maxPrice;
     _selectedSize = size;
-    _selectedCollection = collection;
+    _publicCollectionSlug = collection;
     _selectedMaterial = material;
     notifyListeners();
     fetchProducts();
   }
 
   void clearFilters() {
+    _publicCollectionSlug = null;
     _selectedCategory = 'all';
     _searchQuery = '';
     _sortBy = 'newest';
     _minPrice = null;
     _maxPrice = null;
     _selectedSize = null;
-    _selectedCollection = null;
     _selectedMaterial = null;
     notifyListeners();
     fetchProducts();
@@ -153,17 +168,25 @@ class ProductProvider extends ChangeNotifier {
   }
 
   Future<void> fetchProducts() async {
+    final request = ++_productRequest;
+    final queryKey = '$_selectedCategory|${_publicCollectionSlug ?? ''}';
+    if (queryKey != _lastProductsQuery) {
+      // Never present the previous collection's products under a new cover.
+      _products = [];
+      _lastProductsQuery = queryKey;
+    }
     _isLoading = true;
     notifyListeners();
 
     try {
       final queryParams = <String, dynamic>{
-        'size': 50,
+        'size': _publicCollectionSlug == null ? 50 : 100,
       };
 
-      if (_selectedCategory == 'sunset') {
-        queryParams['collection'] = 'sunset';
-      } else if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
+      if (_publicCollectionSlug != null) {
+        queryParams['collection'] = _publicCollectionSlug;
+      }
+      if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
         queryParams['category'] = _selectedCategory;
       }
 
@@ -186,26 +209,34 @@ class ProductProvider extends ChangeNotifier {
         queryParams['sort'] = 'createdAt,desc';
       }
 
-      final result = await _api.get(
-        ApiConstants.products,
-        queryParams: queryParams,
-        requiresAuth: false,
-      );
-
-      if (result != null && result is Map<String, dynamic> && result['content'] is List) {
-        final list = (result['content'] as List)
-            .map((p) => Product.fromJson(p as Map<String, dynamic>))
-            .toList();
-
-        if (list.isNotEmpty) {
-          _products = list;
+      final List<Product> all = [];
+      var page = 0;
+      var totalPages = 1;
+      do {
+        final result = await _api.get(
+          ApiConstants.products,
+          queryParams: {...queryParams, if (_publicCollectionSlug != null) 'page': page},
+          requiresAuth: false,
+        );
+        if (request != _productRequest) return;
+        if (result is! Map<String, dynamic> || result['content'] is! List) {
+          throw const FormatException('Invalid product page');
         }
-      }
+        all.addAll((result['content'] as List)
+            .map((p) => Product.fromJson(p as Map<String, dynamic>)));
+        totalPages = _publicCollectionSlug == null
+            ? 1
+            : (result['totalPages'] as num?)?.toInt() ?? 1;
+        page++;
+      } while (page < totalPages);
+      if (request == _productRequest) _products = all;
     } catch (e) {
-      debugPrint('[ProductProvider] fetchProducts BE offline, using local data: $e');
+      debugPrint('[ProductProvider] fetchProducts failed: $e');
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (request == _productRequest) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -236,9 +267,7 @@ class ProductProvider extends ChangeNotifier {
     List<Product> list = List.from(_products);
 
     // 1. Filter by Category / Collection
-    if (_selectedCategory == 'sunset') {
-      list = list.where((p) => p.collection.toUpperCase() == 'SUNSET').toList();
-    } else if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
+    if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
       list = list.where((p) => p.type.toLowerCase() == _selectedCategory.toLowerCase()).toList();
     }
 
@@ -250,11 +279,6 @@ class ProductProvider extends ChangeNotifier {
             (p.description?.toLowerCase().contains(q) ?? false) ||
             (p.tag?.toLowerCase().contains(q) ?? false);
       }).toList();
-    }
-
-    // 3. Filter by Collection (if specifically set from Multi-Filter)
-    if (_selectedCollection != null && _selectedCollection != 'all') {
-      list = list.where((p) => p.collection.toUpperCase() == _selectedCollection!.toUpperCase()).toList();
     }
 
     // 4. Filter by Size
