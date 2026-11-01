@@ -6,6 +6,7 @@ import 'admin_accounts_screen.dart';
 import 'admin_categories_screen.dart';
 import 'admin_collections_screen.dart';
 import 'admin_orders_screen.dart';
+import 'admin_stores_screen.dart';
 import 'admin_products_screen.dart';
 import 'admin_roles_screen.dart';
 
@@ -76,6 +77,12 @@ class AdminHomeScreen extends StatelessWidget {
                   title: 'Bộ sưu tập',
                   subtitle: 'Tạo bộ, chọn sản phẩm, ảnh bìa, cho hiện / ẩn',
                   onTap: () => _go(context, const AdminCollectionsScreen()),
+                ),
+                _AdminTile(
+                  icon: Icons.store_mall_directory_outlined,
+                  title: 'Cửa hàng',
+                  subtitle: 'Thêm/sửa/xoá chi nhánh, toạ độ bản đồ, ẩn/hiện',
+                  onTap: () => _go(context, const AdminStoresScreen()),
                 ),
                 const SizedBox(height: 10),
                 const _SectionLabel('NGƯỜI DÙNG'),

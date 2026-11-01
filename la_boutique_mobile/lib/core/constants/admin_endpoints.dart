@@ -52,6 +52,11 @@ class AdminEndpoints {
 
   static String orderStatus(String id) => '/orders/$id/status';
 
+  // --- Cửa hàng / chi nhánh phía admin ---
+  static const String stores = '/stores/admin';
+
+  static String store(String id) => '/stores/admin/$id';
+
   // --- Hội thoại (chat) phía admin ---
   static const String conversations = '/conversations/admin';
 
