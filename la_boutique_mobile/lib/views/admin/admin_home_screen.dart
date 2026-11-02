@@ -8,6 +8,7 @@ import 'admin_collections_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_stores_screen.dart';
 import 'admin_products_screen.dart';
+import 'admin_refunds_screen.dart';
 import 'admin_roles_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
@@ -83,6 +84,12 @@ class AdminHomeScreen extends StatelessWidget {
                   title: 'Cửa hàng',
                   subtitle: 'Thêm/sửa/xoá chi nhánh, toạ độ bản đồ, ẩn/hiện',
                   onTap: () => _go(context, const AdminStoresScreen()),
+                ),
+                _AdminTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Hoàn tiền',
+                  subtitle: 'Danh sách đơn cần hoàn tiền (VNPay đã trả rồi huỷ)',
+                  onTap: () => _go(context, const AdminRefundsScreen()),
                 ),
                 const SizedBox(height: 10),
                 const _SectionLabel('NGƯỜI DÙNG'),

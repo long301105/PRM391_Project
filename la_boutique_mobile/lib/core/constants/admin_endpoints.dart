@@ -52,6 +52,11 @@ class AdminEndpoints {
 
   static String orderStatus(String id) => '/orders/$id/status';
 
+  // --- Thanh toán phía admin ---
+  static const String paymentsRefunds = '/payments/admin/refunds';
+
+  static String codConfirm(String orderNumber) => '/payments/cod/$orderNumber/confirm';
+
   // --- Cửa hàng / chi nhánh phía admin ---
   static const String stores = '/stores/admin';
 

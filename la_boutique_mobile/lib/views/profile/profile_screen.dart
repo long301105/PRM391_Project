@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../auth/forgot_password_screen.dart';
 import '../auth/login_screen.dart';
 import '../auth/register_screen.dart';
+import '../admin/admin_home_screen.dart';
 import '../chat/chat_screen.dart';
 import '../map/store_map_screen.dart';
 import '../order/my_orders_screen.dart';
@@ -278,6 +279,26 @@ class ProfileScreen extends StatelessWidget {
             ],
             const SizedBox(height: 18),
 
+            // Admin section — chỉ hiện với tài khoản có role ADMIN
+            if ((context.watch<AuthProvider>().accountInfo?.roleName ?? '').toUpperCase() ==
+                'ADMIN') ...[
+              _buildSectionCard(
+                title: 'QUẢN TRỊ VIÊN',
+                color: AppColors.sand200,
+                children: [
+                  _buildMenuItem(
+                    icon: Icons.admin_panel_settings_outlined,
+                    title: 'Khu quản trị',
+                    subtitle: 'Đơn hàng, sản phẩm, danh mục, cửa hàng, hội thoại, hoàn tiền',
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminHomeScreen()));
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
+
             // Orders and Features Section
             _buildSectionCard(
               title: 'QUẢN LÝ ĐƠN HÀNG & MUA SẮM',
@@ -403,9 +424,9 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionCard({required String title, required List<Widget> children}) {
+  Widget _buildSectionCard({required String title, required List<Widget> children, Color? color}) {
     return Material(
-      color: AppColors.white,
+      color: color ?? AppColors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),

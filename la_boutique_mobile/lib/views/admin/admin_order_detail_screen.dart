@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order.dart';
 import '../../providers/admin/admin_order_provider.dart';
+import '../../providers/admin/admin_payment_provider.dart';
 import 'admin_widgets.dart';
 
 class AdminOrderDetailScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class AdminOrderDetailScreen extends StatefulWidget {
 class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
   OrderModel? _order;
   bool _loading = false;
+  bool _confirmingCod = false;
+  bool _codConfirmed = false;
 
   @override
   void initState() {
@@ -146,6 +149,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                               ],
                               const SizedBox(height: 14),
                               _buildTransitions(order),
+                              _buildCodConfirm(order),
                             ],
                           ),
                         ),
@@ -298,6 +302,77 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
           }).toList(),
         ),
       ],
+    );
+  }
+
+  Future<void> _confirmCod() async {
+    final order = _order;
+    if (order == null) return;
+    setState(() => _confirmingCod = true);
+    final provider = context.read<AdminPaymentProvider>();
+    final ok = await provider.confirmCod(order.orderNumber);
+    if (!mounted) return;
+    setState(() {
+      _confirmingCod = false;
+      if (ok) _codConfirmed = true;
+    });
+    adminToast(
+      context,
+      ok ? 'Đã ghi nhận thu tiền COD.' : (provider.errorMessage ?? 'Không xác nhận được. Thử lại.'),
+      success: ok,
+    );
+  }
+
+  /// Nút xác nhận đã thu tiền COD — chỉ hiện với đơn COD chưa huỷ.
+  Widget _buildCodConfirm(OrderModel order) {
+    final isCod = order.paymentMethod.toUpperCase() == 'COD';
+    final cancelled = order.status.toUpperCase() == 'CANCELLED';
+    if (!isCod || cancelled) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: _codConfirmed
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, size: 18, color: Color(0xFF2E7D32)),
+                  SizedBox(width: 8),
+                  Text('Đã xác nhận thu tiền COD',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                ],
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Thanh toán COD:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.mute)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.clay600,
+                      side: const BorderSide(color: AppColors.clay500),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                    onPressed: _confirmingCod ? null : _confirmCod,
+                    icon: _confirmingCod
+                        ? const SizedBox(
+                            width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(_confirmingCod ? 'Đang xác nhận...' : 'Xác nhận đã thu tiền COD',
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 

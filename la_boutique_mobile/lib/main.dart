@@ -6,6 +6,7 @@ import 'providers/admin/admin_category_provider.dart';
 import 'providers/admin/admin_collection_provider.dart';
 import 'providers/admin/admin_conversation_provider.dart';
 import 'providers/admin/admin_order_provider.dart';
+import 'providers/admin/admin_payment_provider.dart';
 import 'providers/admin/admin_product_provider.dart';
 import 'providers/admin/admin_role_provider.dart';
 import 'providers/admin/admin_store_provider.dart';
@@ -49,6 +50,7 @@ class LaBoutiqueApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AdminOrderProvider()),
         ChangeNotifierProvider(create: (_) => AdminConversationProvider()),
         ChangeNotifierProvider(create: (_) => AdminStoreProvider()),
+        ChangeNotifierProvider(create: (_) => AdminPaymentProvider()),
       ],
       child: MaterialApp(
         title: 'La Boutique VN',
